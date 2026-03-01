@@ -228,6 +228,7 @@ func (w *Endpoint) NewConnectionEx(ctx context.Context, conn net.Conn, source M.
 	metadata.Inbound = w.Tag()
 	metadata.InboundType = w.Type()
 	metadata.Source = source
+	metadata.User = source.AddrString()
 	for _, localPrefix := range w.localAddresses {
 		if localPrefix.Contains(destination.Addr) {
 			metadata.OriginDestination = destination
@@ -250,6 +251,7 @@ func (w *Endpoint) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn,
 	metadata.Inbound = w.Tag()
 	metadata.InboundType = w.Type()
 	metadata.Source = source
+	metadata.User = source.AddrString()
 	metadata.Destination = destination
 	for _, localPrefix := range w.localAddresses {
 		if localPrefix.Contains(destination.Addr) {
