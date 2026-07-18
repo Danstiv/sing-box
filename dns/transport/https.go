@@ -126,7 +126,7 @@ func NewHTTPSRaw(
 		dialer:           dialer,
 		destination:      destination,
 		headers:          headers,
-		transport:        NewHTTPSTransportWrapper(tls.NewDialer(dialer, tlsConfig), serverAddr),
+		transport:        NewHTTPSTransportWrapper(logger, tls.NewDialer(dialer, tlsConfig), serverAddr),
 	}
 }
 
@@ -146,6 +146,7 @@ func (t *HTTPSTransport) Close() error {
 }
 
 func (t *HTTPSTransport) Reset() {
+	t.logger.Warn("DoH transport reset (network reset)")
 	t.transportAccess.Lock()
 	defer t.transportAccess.Unlock()
 	t.transport.CloseIdleConnections()
@@ -156,17 +157,23 @@ func (t *HTTPSTransport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS
 	startAt := time.Now()
 	response, err := t.exchange(ctx, message)
 	if err != nil {
+		t.logger.WarnContext(ctx, "DoH exchange failed after ", time.Since(startAt), ": ", err)
 		if errors.Is(err, context.DeadlineExceeded) {
 			t.transportAccess.Lock()
 			defer t.transportAccess.Unlock()
 			if t.transportResetAt.After(startAt) {
+				t.logger.WarnContext(ctx, "DoH transport already reset since query start, skipping reset")
 				return nil, err
 			}
+			t.logger.WarnContext(ctx, "DoH deadline exceeded, resetting h2 transport")
 			t.transport.CloseIdleConnections()
 			t.transport = t.transport.Clone()
 			t.transportResetAt = time.Now()
 		}
 		return nil, err
+	}
+	if d := time.Since(startAt); d > time.Second {
+		t.logger.WarnContext(ctx, "DoH exchange succeeded but slow: ", d)
 	}
 	return response, nil
 }

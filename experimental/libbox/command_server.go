@@ -210,6 +210,9 @@ func (s *CommandServer) Pause() {
 	if instance == nil || instance.PauseManager() == nil {
 		return
 	}
+	if b := instance.Box(); b != nil {
+		b.Logger().Warn("device pause (idle mode / screen off)")
+	}
 	instance.PauseManager().DevicePause()
 	if C.IsIos {
 		if s.endPauseTimer == nil {
@@ -224,6 +227,9 @@ func (s *CommandServer) Wake() {
 	instance := s.StartedService.Instance()
 	if instance == nil || instance.PauseManager() == nil {
 		return
+	}
+	if b := instance.Box(); b != nil {
+		b.Logger().Warn("device wake (exit idle mode / screen on)")
 	}
 	if !C.IsIos {
 		instance.PauseManager().DeviceWake()

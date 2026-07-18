@@ -1,0 +1,41 @@
+# Local Android build helpers. Usage:
+#   docker compose build            # build the toolchain image once
+#   docker compose run --rm vendor  # (re)generate vendor/ — after Go dep/import changes
+#   docker compose run --rm lib     # build the libbox AAR — after Go code changes
+#   docker compose run --rm apk     # assemble the debug APK — after Android changes
+#
+# Named volumes persist the go module cache, go build cache and gradle cache
+# across runs (reusing the existing sb-* volumes), so nothing rebuilds from
+# scratch unless the relevant sources actually change.
+
+x-android: &android
+  build:
+    context: .
+    dockerfile: Dockerfile.androidbuild
+  image: sb-android
+  working_dir: /src
+  volumes:
+    - .:/src
+    - gomod:/go/pkg/mod
+    - gobuild:/root/.cache/go-build
+    - gradle:/root/.gradle
+    - android:/root/.android
+
+services:
+  vendor:
+    <<: *android
+    command: go mod vendor
+
+  lib:
+    <<: *android
+    command: bash build-lib.sh
+
+  apk:
+    <<: *android
+    command: bash build-apk.sh
+
+volumes:
+  gomod:
+  gobuild:
+  gradle:
+  android:

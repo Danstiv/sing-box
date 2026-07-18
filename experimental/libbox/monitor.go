@@ -68,6 +68,7 @@ func (m *platformDefaultInterfaceMonitor) UpdateDefaultInterface(interfaceName s
 }
 
 func (m *platformDefaultInterfaceMonitor) updateDefaultInterface(interfaceName string, interfaceIndex32 int32, isExpensive bool, isConstrained bool) {
+	m.logger.Warn("platform reported default interface ", interfaceName, " (index ", interfaceIndex32, ")")
 	m.isExpensive = isExpensive
 	m.isConstrained = isConstrained
 	err := m.networkManager.UpdateInterfaces()
@@ -76,6 +77,7 @@ func (m *platformDefaultInterfaceMonitor) updateDefaultInterface(interfaceName s
 	}
 	m.defaultInterfaceAccess.Lock()
 	if interfaceIndex32 == -1 {
+		m.logger.Warn("platform default interface lost, notifying callbacks")
 		m.defaultInterface = nil
 		callbacks := m.callbacks.Array()
 		m.defaultInterfaceAccess.Unlock()
@@ -93,9 +95,11 @@ func (m *platformDefaultInterfaceMonitor) updateDefaultInterface(interfaceName s
 	}
 	m.defaultInterface = newInterface
 	if oldInterface != nil && oldInterface.Name == m.defaultInterface.Name && oldInterface.Index == m.defaultInterface.Index {
+		m.logger.Warn("platform default interface unchanged (", interfaceName, "/", interfaceIndex32, "), not notifying callbacks")
 		m.defaultInterfaceAccess.Unlock()
 		return
 	}
+	m.logger.Warn("platform default interface changed to ", newInterface.Name, ", notifying callbacks")
 	callbacks := m.callbacks.Array()
 	m.defaultInterfaceAccess.Unlock()
 	for _, callback := range callbacks {

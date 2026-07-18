@@ -452,6 +452,7 @@ func (r *NetworkManager) UpdateWIFIState() {
 }
 
 func (r *NetworkManager) ResetNetwork() {
+	r.logger.Warn("ResetNetwork called (closes connections, does not reset DNS transports)")
 	if r.connectionManager != nil {
 		r.connectionManager.CloseAll()
 	}

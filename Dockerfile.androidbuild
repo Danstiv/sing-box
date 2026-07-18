@@ -1,0 +1,52 @@
+# Throwaway toolchain image for building the sing-box Android debug APK locally.
+# The repo itself is NOT copied in — it is mounted at run time (see build-apk.sh).
+#
+#   docker build -f Dockerfile.androidbuild -t sb-android .
+#   docker run --rm -v "$PWD":/src -w /src \
+#       -v sb-gomod:/go/pkg/mod -v sb-gradle:/root/.gradle \
+#       sb-android bash build-apk.sh
+#
+FROM golang:1.25-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-17-jdk-headless unzip curl git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+# NDK version pinned in clients/android/app/build.gradle.kts (ndkVersion)
+ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/28.0.13004108
+
+# Android command-line tools (recent revision — older ones fail to unpack
+# API 35/36 packages with "Error on ZipFile unknown archive")
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -o /tmp/cmdline.zip \
+    && unzip -q /tmp/cmdline.zip -d ${ANDROID_HOME}/cmdline-tools \
+    && mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
+    && rm /tmp/cmdline.zip
+
+ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:/go/bin
+
+# Accept licenses, then install each SDK package on its own with retries so a
+# single corrupt download doesn't force a full rebuild of the layer.
+RUN yes | sdkmanager --licenses >/dev/null
+RUN for pkg in \
+        "platform-tools" \
+        "platforms;android-36" \
+        "build-tools;36.0.0" \
+        "ndk;28.0.13004108"; do \
+        n=0; \
+        until sdkmanager --install "$pkg"; do \
+            n=$((n+1)); \
+            if [ "$n" -ge 3 ]; then echo "failed to install $pkg" >&2; exit 1; fi; \
+            echo "retry $n for $pkg"; sleep 5; \
+        done; \
+    done
+
+# gomobile / gobind (versions from Makefile: lib_install)
+RUN go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12 \
+    && go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+
+WORKDIR /src

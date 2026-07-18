@@ -400,6 +400,10 @@ func New(options Options) (*Box, error) {
 	}, nil
 }
 
+func (s *Box) Logger() log.ContextLogger {
+	return s.logger
+}
+
 func (s *Box) PreStart() error {
 	err := s.preStart()
 	if err != nil {
