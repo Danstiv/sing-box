@@ -293,7 +293,7 @@ func detectContextWindow(betaHeader string, totalInputTokens int64) int {
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, "/v1/") {
+	if !strings.HasPrefix(r.URL.Path, "/v1/") && r.URL.Path != "/api/oauth/usage" {
 		writeJSONError(w, r, http.StatusNotFound, "not_found_error", "Not found")
 		return
 	}
