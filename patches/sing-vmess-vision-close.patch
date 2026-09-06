@@ -1,0 +1,32 @@
+Fix VLESS xtls-rprx-vision forwarding an extra TLS record after the splice.
+
+Upstream report: https://github.com/SagerNet/sing-box/issues/4404
+
+After the splice both peers read and write the raw socket. VisionConn has no
+Close() of its own, so closing it closes the embedded TLS connection, which
+writes its own close_notify onto that same socket. The peer, already reading
+raw bytes, cannot distinguish it from the inner stream and passes it on to the
+application as a trailing 19-byte record.
+
+--- a/vless/vision.go
++++ b/vless/vision.go
+@@ -380,6 +380,19 @@ func (c *VisionConn) unPadding(buffer []byte) []*buf.Buffer {
+ 	return buffers
+ }
+
++// Close closes the connection.
++//
++// After the splice both peers exchange raw TLS records over the underlying
++// socket. Closing the embedded TLS connection here writes its close_notify onto
++// that same socket, where the peer -- already reading raw -- forwards it to the
++// application as trailing garbage. Once spliced, close the raw connection.
++func (c *VisionConn) Close() error {
++	if c.directRead || c.directWrite {
++		return c.netConn.Close()
++	}
++	return c.Conn.Close()
++}
++
+ func (c *VisionConn) NeedAdditionalReadDeadline() bool {
+ 	return true
+ }
