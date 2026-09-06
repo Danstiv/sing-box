@@ -138,6 +138,19 @@ jobs:
         run: |-
           echo "PATH=$HOME/go/go_win7/bin:$PATH" >> $GITHUB_ENV
           echo "GOROOT=$HOME/go/go_win7" >> $GITHUB_ENV
+      - name: Patch pinned dependencies
+        run: |-
+          set -xeuo pipefail
+          REV=$(go list -m -f '{{.Version}}' github.com/sagernet/sing-vmess)
+          # A pseudo-version (v0.2.8-0.20250909125414-3aed155119a1) ends in the
+          # commit sha; a plain release tag (v0.2.8) has no dash and is passed
+          # through unchanged.
+          git clone -q https://github.com/sagernet/sing-vmess "$RUNNER_TEMP/sing-vmess"
+          git -C "$RUNNER_TEMP/sing-vmess" checkout -q "${REV##*-}"
+          # git apply fails loudly once upstream moves, which is the point: a red
+          # build beats a silently unpatched binary.
+          git -C "$RUNNER_TEMP/sing-vmess" apply "$GITHUB_WORKSPACE/patches/sing-vmess-vision-close.patch"
+          go mod edit -replace github.com/sagernet/sing-vmess="$RUNNER_TEMP/sing-vmess"
       - name: Setup Android NDK
         if: matrix.os == 'android'
         uses: nttld/setup-ndk@v1
